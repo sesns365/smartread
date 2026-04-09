@@ -19,7 +19,7 @@
             background-color: #f3f4f6;
         }
         
-        .readable-block { cursor: pointer; transition: all 0.1s ease; }
+        .readable-block { cursor: pointer; transition: background-color 0.1s ease; }
 
         #text-container { white-space: pre-wrap; word-break: break-word; line-height: 1.8; transition: font-size 0.2s ease; }
         
@@ -35,23 +35,24 @@
             text-decoration-style: wavy; text-decoration-thickness: 2px; color: #111827;
         }
 
-        /* 疊加塊樣式 */
+        /* 疊加塊樣式：確保不影響佈局 */
         .overlay-mode-block { 
-            border: 2px solid transparent; 
-            box-sizing: content-box; 
-            padding: 4px;
-            margin: -6px 0 0 -6px;
+            position: absolute;
+            border: 1px solid transparent; 
+            box-sizing: border-box; 
             z-index: 10;
-            border-radius: 6px;
+            border-radius: 4px;
+            background-color: transparent;
         }
         .overlay-mode-block:hover { 
-            background-color: rgba(59, 130, 246, 0.20); 
-            border-color: rgba(59, 130, 246, 0.5); 
+            background-color: rgba(59, 130, 246, 0.15); 
+            border-color: rgba(59, 130, 246, 0.3); 
         }
+        /* 正在報讀的高亮：確保不會擠壓內容 */
         .overlay-mode-block.reading-active-highlight { 
-            background-color: rgba(253, 224, 71, 0.45); 
-            border: 2px solid #ef4444; 
-            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+            background-color: rgba(253, 224, 71, 0.4); 
+            border: 2px solid #ef4444 !important; 
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
             z-index: 30; 
         }
 
@@ -76,90 +77,70 @@
 <body class="h-screen flex flex-col md:flex-row overflow-hidden">
 
     <!-- PDF 頁碼選擇彈窗 -->
-    <div id="pdfPageModal" class="fixed inset-0 bg-black/60 z-[100] hidden flex items-center justify-center backdrop-blur-sm transition-opacity">
+    <div id="pdfPageModal" class="fixed inset-0 bg-black/70 z-[100] hidden flex items-center justify-center backdrop-blur-sm transition-opacity">
         <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full mx-4 transform transition-transform">
             <div class="text-center mb-6">
-                <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fas fa-file-pdf text-3xl text-blue-500"></i>
+                <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-500 text-3xl">
+                    <i class="fas fa-file-pdf"></i>
                 </div>
-                <h3 class="text-xl font-bold text-gray-800 mb-1">選擇讀取頁碼</h3>
-                <p id="modalPageInfo" class="text-sm text-gray-500">正在確認文件...</p>
+                <h3 class="text-xl font-bold text-gray-800">讀取特定頁面</h3>
+                <p id="modalPageInfo" class="text-xs text-gray-400 mt-1"></p>
             </div>
-            
             <div class="mb-6">
-                <label class="block text-xs font-bold text-gray-600 uppercase mb-2">請輸入頁碼 (例: 1, 3, 5-10)：</label>
-                <input type="text" id="modalPageInput" class="w-full p-3 border-2 border-gray-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all text-sm text-center font-bold tracking-wider" placeholder="留空讀取全部">
+                <input type="text" id="modalPageInput" class="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:border-blue-500 text-center font-bold text-lg" placeholder="例: 1, 3-5">
+                <p class="text-[10px] text-gray-400 mt-2 text-center">留空則載入整份文件</p>
             </div>
-
             <div class="flex gap-3">
-                <button id="modalCancelBtn" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-sm transition-colors">取消</button>
-                <button id="modalConfirmBtn" class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-blue-600/30 transition-colors">確認</button>
+                <button id="modalCancelBtn" class="flex-1 py-3 bg-gray-50 text-gray-500 font-bold rounded-xl hover:bg-gray-100">取消</button>
+                <button id="modalConfirmBtn" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-200">確認</button>
             </div>
         </div>
     </div>
 
-    <!-- 左側控制面板 -->
+    <!-- 左側面板 -->
     <div id="sidebar" class="w-full md:w-1/3 lg:w-1/4 bg-white shadow-lg z-10 flex flex-col h-full shrink-0 border-r border-gray-200">
-        <div class="p-6 bg-blue-600 text-white flex items-center gap-3 shrink-0 shadow-md">
+        <div class="p-6 bg-blue-600 text-white flex items-center gap-3 shrink-0">
             <i class="fas fa-book-reader text-2xl"></i>
             <h1 class="text-xl font-bold tracking-wider">簡易語音報讀器</h1>
         </div>
 
         <div class="flex-1 overflow-y-auto p-5 space-y-5">
-            <!-- 模式設定 -->
+            <!-- 模式切換 -->
             <div class="space-y-2">
-                <label class="block text-[10px] text-gray-400 font-bold uppercase tracking-widest">特殊閱讀模式</label>
-                <div class="grid grid-cols-1 gap-2">
-                    <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100 flex items-center justify-between">
-                        <span class="text-xs font-bold text-indigo-800 flex items-center"><i class="fas fa-align-right mr-2"></i>直書模式</span>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="verticalModeToggle" class="sr-only peer">
-                            <div class="w-9 h-5 bg-gray-300 rounded-full peer peer-checked:bg-indigo-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
-                        </label>
-                    </div>
-
-                    <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-100 flex items-center justify-between">
-                        <span class="text-xs font-bold text-emerald-800 flex items-center"><i class="fas fa-filter mr-2"></i>過濾注音符號</span>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="filterZhuyinToggle" class="sr-only peer" checked>
-                            <div class="w-9 h-5 bg-gray-300 rounded-full peer peer-checked:bg-emerald-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
-                        </label>
-                    </div>
-
-                    <div class="bg-orange-50 p-3 rounded-xl border border-orange-100 flex items-center justify-between">
-                        <span class="text-xs font-bold text-orange-800 flex items-center"><i class="fas fa-magic mr-2"></i>PDF 強制 OCR</span>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="forceOcrToggle" class="sr-only peer">
-                            <div class="w-9 h-5 bg-gray-300 rounded-full peer peer-checked:bg-orange-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
-                        </label>
-                    </div>
-
-                    <div class="bg-blue-50 p-3 rounded-xl border border-blue-100 flex items-center justify-between">
-                        <span class="text-xs font-bold text-blue-800 flex items-center"><i class="fas fa-highlighter mr-2"></i>AI 影像增強</span>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="aiEnhanceToggle" class="sr-only peer" checked>
-                            <div class="w-9 h-5 bg-gray-300 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
-                        </label>
-                    </div>
+                <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-100 flex items-center justify-between">
+                    <span class="text-xs font-bold text-emerald-800 flex items-center"><i class="fas fa-filter mr-2"></i>過濾注音符號</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="filterZhuyinToggle" class="sr-only peer" checked>
+                        <div class="w-9 h-5 bg-gray-300 rounded-full peer peer-checked:bg-emerald-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                    </label>
+                </div>
+                <div class="bg-orange-50 p-3 rounded-xl border border-orange-100 flex items-center justify-between">
+                    <span class="text-xs font-bold text-orange-800 flex items-center"><i class="fas fa-magic mr-2"></i>PDF 強制 OCR</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="forceOcrToggle" class="sr-only peer">
+                        <div class="w-9 h-5 bg-gray-300 rounded-full peer peer-checked:bg-orange-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                    </label>
+                </div>
+                <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100 flex items-center justify-between">
+                    <span class="text-xs font-bold text-indigo-800 flex items-center"><i class="fas fa-align-right mr-2"></i>直書模式</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="verticalModeToggle" class="sr-only peer">
+                        <div class="w-9 h-5 bg-gray-300 rounded-full peer peer-checked:bg-indigo-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                    </label>
                 </div>
             </div>
 
-            <!-- 多功能匯入區 -->
+            <!-- 匯入 -->
             <div class="space-y-3">
-                <label class="block text-sm font-semibold text-gray-700"><i class="fas fa-plus-circle mr-2"></i>匯入內容</label>
                 <div class="flex bg-gray-100 p-1 rounded-lg">
-                    <button onclick="switchTab('file')" id="btn-file" class="flex-1 py-1.5 px-2 text-[11px] font-bold rounded-md tab-active transition-all">檔案匯入</button>
-                    <button onclick="switchTab('text')" id="btn-text" class="flex-1 py-1.5 px-2 text-[11px] font-bold rounded-md text-gray-500 transition-all">貼上文字</button>
+                    <button onclick="switchTab('file')" id="btn-file" class="flex-1 py-1.5 px-2 text-[11px] font-bold rounded-md tab-active">檔案匯入</button>
+                    <button onclick="switchTab('text')" id="btn-text" class="flex-1 py-1.5 px-2 text-[11px] font-bold rounded-md text-gray-500">貼上文字</button>
                 </div>
-
-                <div id="panel-file" class="space-y-2">
-                    <div class="relative border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 transition-colors cursor-pointer group" onclick="document.getElementById('fileInput').click()">
-                        <i class="fas fa-folder-open text-4xl text-blue-300 mb-3 group-hover:scale-110 transition-transform"></i>
-                        <p class="text-[13px] text-gray-600 font-bold">選取 PDF 或 圖片</p>
-                        <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.txt,image/*,.ppt,.pptx">
-                    </div>
+                <div id="panel-file" class="relative border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 cursor-pointer" onclick="document.getElementById('fileInput').click()">
+                    <i class="fas fa-file-upload text-3xl text-blue-300 mb-2"></i>
+                    <p class="text-[13px] text-gray-600 font-bold">點擊上傳 PDF 或圖片</p>
+                    <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.txt,image/*,.ppt,.pptx">
                 </div>
-
                 <div id="panel-text" class="hidden flex flex-col gap-2">
                     <textarea id="pasteTextArea" rows="4" class="w-full text-sm p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="在此輸入文字..."></textarea>
                     <button onclick="processPastedText()" class="w-full bg-blue-600 text-white py-2 rounded-xl text-sm font-bold">確認匯入</button>
@@ -168,11 +149,10 @@
 
             <hr class="border-gray-200">
 
-            <!-- 語音與縮放設定 -->
+            <!-- 語音設定 -->
             <div class="space-y-4">
-                <label class="block text-sm font-semibold text-gray-700"><i class="fas fa-cog mr-2"></i>顯示與語音</label>
                 <div>
-                    <label class="flex justify-between text-[10px] text-gray-400 mb-1 font-bold uppercase"><span>內容縮放比例</span><span id="zoomValue">100%</span></label>
+                    <label class="flex justify-between text-[10px] text-gray-400 font-bold uppercase mb-1"><span>內容縮放比例</span><span id="zoomValue">100%</span></label>
                     <input type="range" id="zoomSlider" min="50" max="250" value="100" step="5" class="w-full accent-blue-600">
                 </div>
                 <div>
@@ -184,15 +164,13 @@
                     <input type="range" id="rateSlider" min="0.5" max="2.5" value="1" step="0.1" class="w-full accent-blue-600">
                 </div>
             </div>
-            
-            <hr class="border-gray-200">
 
-            <!-- 播放控制 -->
+            <!-- 控制鈕 -->
             <div class="space-y-4 pb-6">
                 <div class="flex items-center justify-between bg-blue-50 p-3 rounded-xl border border-blue-100">
                     <span class="text-xs text-blue-800 font-bold flex items-center"><i class="fas fa-bullseye mr-2"></i>單句點讀模式</span>
                     <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="singleModeToggle" class="sr-only peer">
+                        <input type="checkbox" id="singleModeToggle" class="sr-only peer" checked>
                         <div class="w-9 h-5 bg-gray-300 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
                     </label>
                 </div>
@@ -203,46 +181,33 @@
                 </div>
             </div>
         </div>
-        
-        <!-- 底部欄 -->
-        <div class="mt-auto shrink-0 border-t border-gray-100 bg-gray-50/50">
-            <div id="statusArea" class="p-3 bg-white text-[10px] text-gray-500 hidden flex items-center gap-2 border-b border-gray-100">
+
+        <div class="mt-auto border-t border-gray-100">
+            <div id="statusArea" class="p-3 bg-white text-[10px] text-gray-500 hidden flex items-center gap-2">
                 <div class="loader" id="loadingSpinner"></div>
-                <span id="statusText">正在處理...</span>
+                <span id="statusText">系統就緒</span>
             </div>
-            <div class="p-4 text-center">
-                <p class="text-[11px] font-black text-gray-400 tracking-[0.3em] uppercase flex items-center justify-center gap-3">
-                    <span class="w-6 h-px bg-gray-200"></span>
-                    由特工365製作
-                    <span class="w-6 h-px bg-gray-200"></span>
-                </p>
+            <div class="p-4 bg-white text-center">
+                <p class="text-[11px] font-black text-gray-300 tracking-[0.3em] uppercase">由特工365製作</p>
             </div>
         </div>
     </div>
 
-    <!-- 右側閱讀內容區 -->
+    <!-- 右側 -->
     <div class="flex-1 h-full flex flex-col relative bg-gray-100 overflow-hidden">
-        
         <button onclick="toggleSidebar()" id="sidebarToggleBtn" class="absolute top-4 left-4 z-50 bg-white text-gray-700 w-11 h-11 rounded-2xl shadow-xl border border-gray-100 flex items-center justify-center hover:text-blue-600 transition-all">
             <i class="fas fa-outdent"></i>
         </button>
 
-        <div class="flex-1 h-full overflow-auto p-4 pt-20 md:p-10 md:pt-20 scroll-smooth" id="mainScrollArea">
+        <div class="flex-1 h-full overflow-auto p-4 pt-20 scroll-smooth" id="mainScrollArea">
             <div id="zoom-wrapper" class="mx-auto" style="width: 100%;">
-                <div class="bg-white shadow-2xl shadow-blue-900/5 border border-gray-100 rounded-3xl min-h-[90%] p-4 md:p-12 flex flex-col items-center justify-center relative">
-                    
-                    <div id="preview-container" class="hidden w-full flex flex-col items-center gap-10 leading-none"></div>
+                <div class="bg-white shadow-2xl border border-gray-100 rounded-3xl min-h-[90%] p-4 md:p-12 flex flex-col items-center relative overflow-visible" id="document-stage">
+                    <div id="preview-container" class="hidden w-full flex flex-col items-center gap-10 leading-none relative"></div>
                     <div id="text-container" class="w-full text-gray-800 text-[20px] hidden"></div>
-                    
-                    <div id="initial-placeholder" class="text-center text-gray-300 flex flex-col items-center w-full max-w-sm">
-                        <div class="w-28 h-28 bg-blue-50 rounded-full flex items-center justify-center mb-8">
-                            <i class="fas fa-file-invoice text-5xl text-blue-200"></i>
-                        </div>
-                        <h3 class="text-gray-600 font-bold text-xl mb-3">準備好開始閱讀了嗎？</h3>
-                        <p class="text-sm leading-relaxed mb-4 text-gray-400 text-center">
-                            單句點讀模式現在會自動偵測標點符號。<br>
-                            遇到<span class="text-blue-500 font-bold">逗號</span>即會停止。
-                        </p>
+                    <div id="initial-placeholder" class="text-center text-gray-300 flex flex-col items-center w-full max-w-sm mt-32">
+                        <i class="fas fa-file-medical text-6xl mb-6 opacity-30"></i>
+                        <h3 class="text-gray-600 font-bold text-xl mb-3">課本點讀即將開始</h3>
+                        <p class="text-sm text-gray-400">請從左側匯入國語課本 PDF，<br>並開啟「強制 OCR」以獲得最佳字詞對齊。</p>
                     </div>
                 </div>
             </div>
@@ -259,14 +224,11 @@
         const initialPlaceholder = document.getElementById('initial-placeholder');
         const voiceSelect = document.getElementById('voiceSelect');
         const rateSlider = document.getElementById('rateSlider');
-        const rateValue = document.getElementById('rateValue');
         const zoomSlider = document.getElementById('zoomSlider');
-        const zoomValueText = document.getElementById('zoomValue');
         const singleModeToggle = document.getElementById('singleModeToggle');
         const verticalModeToggle = document.getElementById('verticalModeToggle');
         const forceOcrToggle = document.getElementById('forceOcrToggle');
         const filterZhuyinToggle = document.getElementById('filterZhuyinToggle');
-        const aiEnhanceToggle = document.getElementById('aiEnhanceToggle');
         const playBtn = document.getElementById('playBtn');
         const pauseBtn = document.getElementById('pauseBtn');
         const stopBtn = document.getElementById('stopBtn');
@@ -281,37 +243,29 @@
         let isPlaying = false;
         let readMode = 'continuous'; 
 
-        // --- 功能與頁面切換 ---
+        // --- 介面控制 ---
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
-            const icon = document.querySelector('#sidebarToggleBtn i');
             sidebar.classList.toggle('sidebar-collapsed');
-            icon.className = sidebar.classList.contains('sidebar-collapsed') ? 'fas fa-indent' : 'fas fa-outdent';
+            document.querySelector('#sidebarToggleBtn i').className = sidebar.classList.contains('sidebar-collapsed') ? 'fas fa-indent' : 'fas fa-outdent';
         }
 
         function switchTab(tabId) {
             ['file', 'text'].forEach(id => {
                 const btn = document.getElementById(`btn-${id}`);
                 const panel = document.getElementById(`panel-${id}`);
-                if(id === tabId) {
-                    btn.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded-md tab-active transition-all";
-                    panel.classList.remove('hidden');
-                } else {
-                    btn.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded-md text-gray-500 transition-all";
-                    panel.classList.add('hidden');
-                }
+                if(id === tabId) { btn.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded-md tab-active transition-all"; panel.classList.remove('hidden'); }
+                else { btn.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded-md text-gray-500 transition-all"; panel.classList.add('hidden'); }
             });
         }
 
-        // --- 縮放拉桿 ---
         zoomSlider.addEventListener('input', (e) => {
             const val = e.target.value;
-            zoomValueText.textContent = val + '%';
+            document.getElementById('zoomValue').textContent = val + '%';
             zoomWrapper.style.width = `${val}%`;
             textContainer.style.fontSize = `${20 * (val / 100)}px`;
         });
 
-        // --- 語音系統初始化 ---
         function populateVoices() {
             voices = synth.getVoices();
             if (!voices.length) return;
@@ -320,7 +274,7 @@
         populateVoices();
         if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = populateVoices;
 
-        rateSlider.addEventListener('input', (e) => rateValue.textContent = e.target.value + 'x');
+        rateSlider.addEventListener('input', (e) => document.getElementById('rateValue').textContent = e.target.value + 'x');
 
         function showStatus(message, isLoading = false) {
             statusArea.classList.remove('hidden');
@@ -337,65 +291,38 @@
             initialPlaceholder.classList.add('hidden');
         }
 
-        // --- 字元過濾 (去注音) ---
+        // --- 字元過濾核心 ---
         function cleanText(txt) {
+            if (!txt) return "";
             if (filterZhuyinToggle.checked) {
-                // 過濾注音符號與聲調
+                // 過濾注音符號（Unicode: 3105-312F）以及聲調符號
                 return txt.replace(/[\u3105-\u312F\u02EA\u02EBˊˇˋ˙]/g, '').trim();
             }
             return txt.trim();
         }
 
-        // --- 影像增強技術 ---
-        function applyAIEnhancement(canvas) {
-            if (!aiEnhanceToggle.checked) return canvas;
-            const procCanvas = document.createElement('canvas');
-            procCanvas.width = canvas.width; procCanvas.height = canvas.height;
-            const pctx = procCanvas.getContext('2d');
-            pctx.filter = 'grayscale(100%) contrast(350%) brightness(110%)';
-            pctx.drawImage(canvas, 0, 0);
-            return procCanvas;
-        }
+        // --- 核心更新：細緻斷句與標點感應 ---
+        function splitTextBySmartSegments(line) {
+            const segments = [];
+            let currentWords = [];
+            const puncs = /[，、；：。！？,.;!?]/;
 
-        // --- 頁碼選擇彈窗 ---
-        function askForPageRange(maxPages) {
-            return new Promise((resolve) => {
-                const modal = document.getElementById('pdfPageModal');
-                const infoText = document.getElementById('modalPageInfo');
-                const confirmBtn = document.getElementById('modalConfirmBtn');
-                const cancelBtn = document.getElementById('modalCancelBtn');
-                const input = document.getElementById('modalPageInput');
-
-                infoText.textContent = `這份 PDF 共有 ${maxPages} 頁。`;
-                modal.classList.remove('hidden');
-
-                const cleanup = () => {
-                    confirmBtn.onclick = null;
-                    cancelBtn.onclick = null;
-                    modal.classList.add('hidden');
-                };
-
-                confirmBtn.onclick = () => { cleanup(); resolve(input.value); };
-                cancelBtn.onclick = () => { cleanup(); resolve(null); };
-            });
-        }
-
-        function parsePageRange(rangeStr, maxPages) {
-            if (!rangeStr || !rangeStr.trim()) return Array.from({length: maxPages}, (_, i) => i + 1);
-            const pages = new Set();
-            rangeStr.split(',').forEach(part => {
-                if (part.includes('-')) {
-                    const [s, e] = part.split('-').map(n => parseInt(n.trim()));
-                    if (!isNaN(s) && !isNaN(e)) for (let i = Math.max(1, s); i <= Math.min(maxPages, e); i++) pages.add(i);
-                } else {
-                    const n = parseInt(part.trim());
-                    if (!isNaN(n) && n >= 1 && n <= maxPages) pages.add(n);
+            (line.words || [line]).forEach(w => {
+                const cleaned = cleanText(w.text);
+                if (!cleaned) return;
+                
+                currentWords.push(w);
+                // 遇到標點符號，將目前的詞塊組合成一個「發音段落」
+                if (puncs.test(w.text)) {
+                    segments.push({ words: [...currentWords] });
+                    currentWords = [];
                 }
             });
-            return Array.from(pages).sort((a, b) => a - b);
+            if (currentWords.length > 0) segments.push({ words: currentWords });
+            return segments;
         }
 
-        // --- 檔案處理入口 ---
+        // --- PDF 與 OCR 解析 ---
         fileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -405,21 +332,17 @@
 
         async function handleFileCore(file) {
             resetView();
-            showStatus(`正在讀取檔案...`, true);
+            showStatus(`處理中...`, true);
             try {
-                const name = file.name.toLowerCase();
-                if (name.endsWith('.pdf')) {
+                if (file.name.toLowerCase().endsWith('.pdf')) {
                     const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
                     const rangeStr = await askForPageRange(pdf.numPages);
-                    if (rangeStr === null) return showStatus('已取消');
-
-                    showStatus('渲染中...', true);
+                    if (rangeStr === null) return showStatus('取消匯入');
                     previewContainer.classList.remove('hidden');
                     const pages = parsePageRange(rangeStr, pdf.numPages);
-                    
                     if (forceOcrToggle.checked) await parsePDFWithOCR(pdf, pages);
                     else await parsePDFOverlay(pdf, pages);
-                } else if (file.type.startsWith('image/') || name.match(/\.(jpg|jpeg|png)$/)) {
+                } else if (file.type.startsWith('image/')) {
                     previewContainer.classList.remove('hidden');
                     await parseImageOverlay(file);
                 } else {
@@ -427,23 +350,41 @@
                     renderTextMode(await file.text());
                 }
                 showStatus("載入完成");
-            } catch (error) {
-                showStatus(`失敗: ${error.message}`);
-                initialPlaceholder.classList.remove('hidden');
-            }
+            } catch (error) { showStatus(`載入失敗: ${error.message}`); initialPlaceholder.classList.remove('hidden'); }
         }
 
-        // --- 強制 OCR 與 標點符號細緻切分邏輯 ---
-        async function parsePDFWithOCR(pdf, pageNumbers) {
+        async function askForPageRange(maxPages) {
+            return new Promise((res) => {
+                const modal = document.getElementById('pdfPageModal');
+                const input = document.getElementById('modalPageInput');
+                document.getElementById('modalPageInfo').textContent = `共 ${maxPages} 頁`;
+                modal.classList.remove('hidden');
+                document.getElementById('modalConfirmBtn').onclick = () => { modal.classList.add('hidden'); res(input.value); };
+                document.getElementById('modalCancelBtn').onclick = () => { modal.classList.add('hidden'); res(null); };
+            });
+        }
+
+        function parsePageRange(str, max) {
+            if (!str || !str.trim()) return Array.from({length: max}, (_, i) => i + 1);
+            const p = new Set();
+            str.split(',').forEach(v => {
+                if (v.includes('-')) {
+                    const [s, e] = v.split('-').map(n => parseInt(n.trim()));
+                    for (let i=s; i<=e && i<=max; i++) p.add(i);
+                } else p.add(parseInt(v.trim()));
+            });
+            return Array.from(p).filter(n => n > 0 && n <= max).sort((a,b)=>a-b);
+        }
+
+        async function parsePDFWithOCR(pdf, pageNums) {
             const isV = verticalModeToggle.checked;
             const worker = await Tesseract.createWorker(isV ? 'chi_tra_vert+eng' : 'chi_tra+eng');
-
-            for (const pageNum of pageNumbers) {
-                showStatus(`第 ${pageNum} 頁 AI 影像辨識中...`, true);
-                const page = await pdf.getPage(pageNum);
-                const vp = page.getViewport({ scale: 2.0 }); 
+            for (const n of pageNums) {
+                showStatus(`OCR 處理第 ${n} 頁...`, true);
+                const page = await pdf.getPage(n);
+                const vp = page.getViewport({ scale: 2.0 });
                 const wrap = document.createElement('div');
-                wrap.className = 'relative shadow-xl bg-white border border-gray-100 mb-10 leading-none mx-auto';
+                wrap.className = 'relative shadow-xl bg-white border mb-10 mx-auto overflow-visible';
                 wrap.style.cssText = `width:${vp.width}px; max-width:100%; height:auto;`;
                 const canvas = document.createElement('canvas');
                 canvas.width = vp.width; canvas.height = vp.height;
@@ -453,24 +394,19 @@
                 wrap.appendChild(canvas);
                 previewContainer.appendChild(wrap);
 
-                const enhanced = applyAIEnhancement(canvas);
-                const res = await worker.recognize(enhanced);
-                
+                // AI 辨識
+                const res = await worker.recognize(canvas);
                 res.data.lines.forEach((l, lIdx) => {
-                    const text = cleanText(l.text);
-                    if (!text) return;
-                    
-                    // 根據標點符號將這一行再切分成多個「讀報段落」
-                    const segments = splitTextIntoSegments(l);
+                    const segments = splitTextBySmartSegments(l);
                     segments.forEach((seg, sIdx) => {
-                        const groupId = `ocr-${pageNum}-${lIdx}-${sIdx}`;
+                        const gid = `ocr-${n}-${lIdx}-${seg.words[0].text}`;
                         seg.words.forEach(w => {
-                            const b = w.bbox; 
+                            const b = w.bbox;
                             const blk = document.createElement('div');
                             blk.className = 'readable-block overlay-mode-block absolute text-transparent select-none';
                             blk.style.cssText = `left:${b.x0/vp.width*100}%; top:${b.y0/vp.height*100}%; width:${(b.x1-b.x0)/vp.width*100}%; height:${(b.y1-b.y0)/vp.height*100}%`;
                             blk.setAttribute('data-text', cleanText(w.text));
-                            blk.setAttribute('data-group', groupId);
+                            blk.setAttribute('data-group', gid);
                             wrap.appendChild(blk);
                         });
                     });
@@ -480,52 +416,55 @@
             bindReadableBlocks();
         }
 
-        // 輔助函式：將 OCR 的整行文字，依標點符號切分成數個子段落
-        function splitTextIntoSegments(line) {
-            const results = [];
-            let currentWords = [];
-            const puncs = /[，、；：。！？,.;!?]/;
-
-            (line.words || [line]).forEach(w => {
-                const txt = w.text;
-                currentWords.push(w);
-                // 如果這個單詞包含標點符號，則結束當前段落
-                if (puncs.test(txt)) {
-                    results.push({ words: [...currentWords] });
-                    currentWords = [];
-                }
-            });
-            if (currentWords.length > 0) results.push({ words: currentWords });
-            return results;
+        async function parsePDFOverlay(pdf, pageNums) {
+            const isV = verticalModeToggle.checked;
+            for (const n of pageNums) {
+                const page = await pdf.getPage(n);
+                const vp = page.getViewport({ scale: 2.0 });
+                const wrap = document.createElement('div');
+                wrap.className = 'relative shadow-xl border mb-10 mx-auto overflow-visible';
+                wrap.style.cssText = `width:${vp.width}px; max-width:100%; height:auto;`;
+                const can = document.createElement('canvas');
+                can.width = vp.width; can.height = vp.height;
+                await page.render({ canvasContext: can.getContext('2d'), viewport: vp }).promise;
+                wrap.appendChild(can);
+                const content = await page.getTextContent();
+                let lastGid = 0; let lastIt = null;
+                content.items.map(it => {
+                    const txt = cleanText(it.str);
+                    const tx = pdfjsLib.Util.transform(vp.transform, it.transform);
+                    const fh = Math.sqrt(tx[2]**2 + tx[3]**2);
+                    return { txt, x:tx[4], y:tx[5]-fh, w:it.width*vp.scale, h:fh };
+                }).filter(it => it.txt).forEach(it => {
+                    if (lastIt && (Math.abs(it.y - lastIt.y) > it.h*0.5 || /[，、；：。！？]/.test(lastIt.txt))) lastGid++;
+                    const b = document.createElement('div');
+                    b.className = 'readable-block overlay-mode-block absolute text-transparent select-none';
+                    b.style.cssText = `left:${it.x/vp.width*100}%; top:${it.y/vp.height*100}%; width:${it.w/vp.width*100}%; height:${it.h/vp.height*100}%`;
+                    b.setAttribute('data-text', it.txt); b.setAttribute('data-group', `pdf-${n}-${lastGid}`);
+                    wrap.appendChild(b); lastIt = it;
+                });
+                previewContainer.appendChild(wrap);
+            }
+            bindReadableBlocks();
         }
 
-        // --- 圖片 OCR ---
         async function parseImageOverlay(file) {
-            const isV = verticalModeToggle.checked;
             const img = new Image(); img.src = URL.createObjectURL(file);
             await new Promise(r=>img.onload=r);
             const wrap = document.createElement('div');
-            wrap.className = 'relative shadow-2xl border border-gray-100 block mx-auto bg-white leading-none';
+            wrap.className = 'relative shadow-2xl border block mx-auto bg-white overflow-visible';
             wrap.style.cssText = `width:${img.naturalWidth}px; max-width:100%; height:auto;`;
-            const disp = document.createElement('img'); disp.src = img.src; disp.className = 'w-full h-auto block m-0 p-0'; 
-            wrap.appendChild(disp);
-            previewContainer.appendChild(wrap);
-            
-            const worker = await Tesseract.createWorker(isV ? 'chi_tra_vert+eng' : 'chi_tra+eng');
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = img.naturalWidth; tempCanvas.height = img.naturalHeight;
-            tempCanvas.getContext('2d').drawImage(img, 0, 0);
-            const res = await worker.recognize(applyAIEnhancement(tempCanvas));
-            
-            res.data.lines.forEach((l, lIdx) => {
-                const segments = splitTextIntoSegments(l);
-                segments.forEach((seg, sIdx) => {
-                    const gid = `img-${lIdx}-${sIdx}`;
+            const disp = document.createElement('img'); disp.src = img.src; disp.className = 'w-full h-auto block'; 
+            wrap.appendChild(disp); previewContainer.appendChild(wrap);
+            const worker = await Tesseract.createWorker(verticalModeToggle.checked ? 'chi_tra_vert+eng' : 'chi_tra+eng');
+            const res = await worker.recognize(img);
+            res.data.lines.forEach((l, idx) => {
+                const segs = splitTextBySmartSegments(l);
+                segs.forEach((seg, sIdx) => {
+                    const gid = `img-${idx}-${sIdx}`;
                     seg.words.forEach(w => {
-                        const wt = cleanText(w.text);
-                        if (!wt) return;
-                        const b = w.bbox;
-                        const blk = document.createElement('div');
+                        const wt = cleanText(w.text); if(!wt) return;
+                        const b = w.bbox; const blk = document.createElement('div');
                         blk.className = 'readable-block overlay-mode-block absolute text-transparent select-none';
                         blk.style.cssText = `left:${b.x0/img.naturalWidth*100}%; top:${b.y0/img.naturalHeight*100}%; width:${(b.x1-b.x0)/img.naturalWidth*100}%; height:${(b.y1-b.y0)/img.naturalHeight*100}%`;
                         blk.setAttribute('data-text', wt); blk.setAttribute('data-group', gid);
@@ -533,105 +472,43 @@
                     });
                 });
             });
-            await worker.terminate();
-            bindReadableBlocks();
+            await worker.terminate(); bindReadableBlocks();
         }
 
-        // --- 原生 PDF 解析 (智慧分組) ---
-        async function parsePDFOverlay(pdf, pageNumbers) {
-            const isV = verticalModeToggle.checked;
-            for (const pageNum of pageNumbers) {
-                const page = await pdf.getPage(pageNum);
-                const vp = page.getViewport({ scale: 2.0 });
-                const wrap = document.createElement('div');
-                wrap.className = 'relative shadow-xl bg-white border border-gray-100 mb-10 leading-none mx-auto';
-                wrap.style.cssText = `width:${vp.width}px; max-width:100%; height:auto;`;
-                const can = document.createElement('canvas');
-                can.width = vp.width; can.height = vp.height;
-                const ctx = can.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,can.width,can.height);
-                await page.render({ canvasContext: ctx, viewport: vp }).promise;
-                wrap.appendChild(can);
-                
-                const content = await page.getTextContent();
-                let mapped = content.items.map(it => {
-                    const str = cleanText(it.str);
-                    const tx = pdfjsLib.Util.transform(vp.transform, it.transform);
-                    const fh = Math.sqrt(tx[2]**2 + tx[3]**2);
-                    return { str, x: tx[4], y: tx[5]-fh, w: it.width*vp.scale, h: fh };
-                }).filter(it => it.str);
-
-                // 智慧分組邏輯：同一行且沒遇到標點符號的組合在一起
-                let currentGid = 0;
-                let lastItem = null;
-                const puncs = /[，、；：。！？,.;!?]/;
-
-                mapped.forEach(it => {
-                    if (lastItem) {
-                        // 換行判斷
-                        const isNewLine = isV ? (Math.abs(it.x - lastItem.x) > it.w*0.5) : (Math.abs(it.y - lastItem.y) > it.h*0.5);
-                        // 遇到標點符號判斷 (上一個字是標點符號，則這一個字是新組的開始)
-                        const afterPunc = puncs.test(lastItem.str);
-                        if (isNewLine || afterPunc) currentGid++;
-                    }
-                    const gid = `native-${pageNum}-${currentGid}`;
-                    const b = document.createElement('div');
-                    b.className = 'readable-block overlay-mode-block absolute text-transparent select-none';
-                    b.style.cssText = `left:${it.x/vp.width*100}%; top:${it.y/vp.height*100}%; width:${it.w/vp.width*100}%; height:${it.h/vp.height*100}%`;
-                    b.setAttribute('data-text', it.str);
-                    b.setAttribute('data-group', gid);
-                    wrap.appendChild(b);
-                    lastItem = it;
-                });
-                previewContainer.appendChild(wrap);
-            }
-            bindReadableBlocks();
-        }
-
-        // --- 純文字渲染 ---
         function renderTextMode(text) {
             const parsed = text.replace(/[\r\n]+/g, '\n').trim();
             let html = "";
-            // 斷句正規表示式：包含逗號等
-            const regex = /[^，、；：。！？,.;!?\n]+[，、；：。！？,.;!?\n]*/g;
+            const regex = /[^，、；：。！？\n]+[，、；：。！？\n]*/g;
             let m;
             while ((m = regex.exec(parsed)) !== null) {
                 const s = cleanText(m[0]);
                 if (s.trim()) html += `<span class="readable-block text-mode-block inline-block" data-text="${escapeHTML(s)}">${escapeHTML(s)}</span>`;
             }
             textContainer.innerHTML = html;
-            bindReadableBlocks();
+            bindSimpleReadableBlocks();
         }
 
         function escapeHTML(s) { return s.replace(/[&<>'"]/g, t => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[t])); }
 
-        // --- 核心報讀引擎：卡拉OK 跟讀同步 ---
+        // --- 核心跟讀標記與同步引擎 ---
         function bindReadableBlocks() {
             utterances = [];
             const allBlocks = Array.from(document.querySelectorAll('.readable-block'));
-            let groups = [];
-            let current = null;
+            const groups = []; let current = null;
 
-            // 1. 組織分組
             allBlocks.forEach(b => {
                 const gid = b.getAttribute('data-group');
                 if (gid) {
-                    if (!current || current.id !== gid) {
-                        current = { id: gid, text: "", blocks: [] };
-                        groups.push(current);
-                    }
+                    if (!current || current.id !== gid) { current = { id: gid, text: "", blocks: [] }; groups.push(current); }
                     b.setAttribute('data-start', current.text.length);
                     current.text += b.getAttribute('data-text');
                     b.setAttribute('data-end', current.text.length);
                     current.blocks.push(b);
-                } else {
-                    groups.push({ text: b.getAttribute('data-text'), blocks: [b] });
-                }
+                } else { groups.push({ text: b.getAttribute('data-text'), blocks: [b] }); }
             });
 
-            // 2. 建立報讀序列與卡拉OK事件
             groups.forEach((g, idx) => {
                 const u = new SpeechSynthesisUtterance(g.text);
-                
                 g.blocks.forEach(b => b.onclick = (e) => { 
                     e.stopPropagation(); 
                     readMode = singleModeToggle.checked ? 'single' : 'continuous';
@@ -644,40 +521,37 @@
                     g.blocks[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
                 };
 
-                // 重要：卡拉OK 跟讀邏輯 (動態切換螢光標示)
                 u.onboundary = (e) => {
-                    if (e.name === 'word' || e.name === 'sentence') {
-                        const charIdx = e.charIndex;
-                        const target = g.blocks.find(b => {
-                            const start = parseInt(b.getAttribute('data-start'));
-                            const end = parseInt(b.getAttribute('data-end'));
-                            return charIdx >= start && charIdx < end;
-                        });
-                        if (target) {
-                            clearHighlights();
-                            target.classList.add('reading-active-highlight');
-                        }
-                    }
+                    const charIdx = e.charIndex;
+                    const target = g.blocks.find(b => charIdx >= parseInt(b.getAttribute('data-start')) && charIdx < parseInt(b.getAttribute('data-end')));
+                    if (target) { clearHighlights(); target.classList.add('reading-active-highlight'); }
                 };
 
                 u.onend = () => {
                     g.blocks.forEach(b => b.classList.remove('reading-active-highlight'));
-                    if (readMode === 'continuous' && idx + 1 < utterances.length) {
-                        setTimeout(() => playUtterance(idx + 1), 50);
-                    } else {
-                        stopReading();
-                    }
+                    if (readMode === 'continuous' && idx + 1 < utterances.length) playUtterance(idx + 1);
+                    else stopReading();
                 };
                 utterances.push(u);
             });
         }
 
-        function clearHighlights() {
-            document.querySelectorAll('.reading-active-highlight').forEach(el => el.classList.remove('reading-active-highlight'));
+        function clearHighlights() { document.querySelectorAll('.reading-active-highlight').forEach(el => el.classList.remove('reading-active-highlight')); }
+
+        function bindSimpleReadableBlocks() {
+            utterances = [];
+            document.querySelectorAll('.readable-block').forEach((b, i) => {
+                const u = new SpeechSynthesisUtterance(b.getAttribute('data-text'));
+                b.onclick = (e) => { e.stopPropagation(); startReadingFromIndex(i); };
+                u.onstart = () => { clearHighlights(); b.classList.add('reading-active-highlight'); b.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+                u.onend = () => { b.classList.remove('reading-active-highlight'); if(readMode==='continuous' && i+1<utterances.length) playUtterance(i+1); else stopReading(); };
+                utterances.push(u);
+            });
         }
 
         function playUtterance(i) {
             currentUtteranceIndex = i;
+            if (!utterances[i]) return;
             const u = utterances[i];
             const v = voices.find(v => v.name === voiceSelect.selectedOptions[0]?.getAttribute('data-name'));
             if (v) u.voice = v;
@@ -687,20 +561,15 @@
         }
 
         function startReading() {
-            if (utterances.length === 0) return alert("請先匯入內容。");
+            if (utterances.length === 0) return;
             if (synth.paused) { synth.resume(); isPlaying = true; updateButtons(); return; }
             readMode = 'continuous'; synth.cancel();
             setTimeout(() => playUtterance(currentUtteranceIndex), 100);
         }
 
-        function startReadingFromIndex(i) {
-            synth.cancel();
-            setTimeout(() => playUtterance(i), 100);
-        }
-
+        function startReadingFromIndex(i) { synth.cancel(); setTimeout(() => playUtterance(i), 100); }
         function pauseReading() { if (synth.speaking && !synth.paused) { synth.pause(); isPlaying = false; updateButtons(); } }
         function stopReading() { synth.cancel(); isPlaying = false; currentUtteranceIndex = 0; updateButtons(); clearHighlights(); }
-        
         function updateButtons() {
             playBtn.classList.toggle('opacity-50', isPlaying && !synth.paused);
             pauseBtn.classList.toggle('opacity-50', !isPlaying);
